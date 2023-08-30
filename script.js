@@ -1,0 +1,9 @@
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const size = Math.min(window.innerWidth,window.innerHeight);
+const width = size;
+const height = size;
+canvas.width = width;
+canvas.height = height;
+let circles = [];
+let brushSize = []
