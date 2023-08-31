@@ -9,9 +9,28 @@ canvas.height = height;
 let circles = [];
 let mapWidth = width;
 let mapHeight = height;
-let stepSize = 1;
 let brushSize = 3;
+let stepSize = brushSize / 2;
 
+
+let brushSizeStamps = [];
+for (let i = 1; i < 20; i ++){
+    brushSizeStamps.push([]);
+    let size = (i * 2)+1;
+    for (let j = 0; j < size; j ++){
+        for (let k = 0; k < size; k ++){
+            let distToCenter = 1-dist(j,k,i,i) / dist(0,0,i, i);
+            if (distToCenter < 0.5){
+                distToCenter = 0;
+            }else{
+                distToCenter = 1;
+            }
+            
+            brushSizeStamps[i-1].push(distToCenter);
+        }
+    }
+}
+console.log(brushSizeStamps[brushSize-1]);
 
 
 
@@ -36,10 +55,11 @@ document.addEventListener("mouseup", () =>{
 })
 
 let prevTime = 0;
-let worker;
+let workers = [];
 let cursorPosx = 0;
 let cursorPosy = 0;
-let pixelArray = new Uint8ClampedArray(mapWidth * mapHeight * 4);
+let pixels = new Uint8ClampedArray(mapWidth * mapHeight * 4);
+let circlesToBeDrawn = [];
 function animate(){
     let time = Date.now();
     let dt = time - prevTime;
@@ -54,11 +74,11 @@ function animate(){
         cursorPosy -= (cursorPosy - mousePosY) / size * stepSize;
         let c = {x:cursorPosx,y:cursorPosy,size:brushSize}
         circles.push(c);
-        AddCircle(c,pixelArray);
-
+        circlesToBeDrawn.push(c);
     }
-    ctx.clearRect(0,0,width,height);
-    ctx.putImageData(new ImageData(pixelArray,mapWidth,mapHeight),0,0);
+    DrawCircles(circlesToBeDrawn,time)
+    ctx.putImageData(new ImageData(pixels,mapWidth,mapHeight),0,0);
+
     // if (moved){
     //     if (worker != null){worker.terminate();}
     //     worker = new Worker("canvasManager.js");
