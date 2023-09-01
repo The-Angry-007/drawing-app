@@ -25,27 +25,29 @@ function UpdateCanvas(circles,mapWidth,mapHeight){
 }
 
 addEventListener("message",function(e){
-    AddCircle(e.data.circle,e.data.pixels,e.data.pixelsWidth,e.data.pixelsHeight);
+    GenerateNewImage(e.data.circles,e.data.mapWidth,e.data.mapHeight,e.data.zoom,e.data.bstamps);
 });
 
-function AddCircle(circle){
-    console.log("drawing...");
-    for (let x = circle.x  - circle.size; x < circle.x + circle.size; x ++){
-        for (let y = circle.y-circle.size; y < circle.y + circle.size; y ++){
+function AddCircle(circle,pixels,zoom,mapWidth,mapHeight,bstamps = null){
+    if (bstamps != null){
+        brushSizeStamps = bstamps;
+    }
+    for (let x = circle.x  - circle.size * zoom; x < circle.x + circle.size * zoom; x ++){
+        for (let y = circle.y-circle.size * zoom; y < circle.y + circle.size * zoom; y ++){
             let startx = Math.floor(circle.x-circle.size);
             let starty = Math.floor(circle.y-circle.size);
             let posx = Math.floor(x);
             let posy = Math.floor(y);
             if (posx < 0 || posy < 0){continue;}
-            if (posx >= mapWidth || posy >= mapHeight){break;}
-            let index = (posx + posy * mapWidth) * 4
+            if (posx >= mapWidth * zoom || posy >= mapHeight * zoom){break;}
+            let index = (posx * zoom + posy * mapWidth * zoom) * 4
             let pixelCol = {r:pixels[index]/255,g:pixels[index+1]/255,b:pixels[index+2]/255,a:pixels[index+3]/255};
-            let col = blendCols({r:0,g:0,b:0,a:brushSizeStamps[circle.size-1][(posx-startx) + (posy-starty) * (circle.size*2+1)]},pixelCol);
+            console.log(circle.size * zoom - 1);
+            let col = blendCols({r:0,g:0,b:0,a:brushSizeStamps[Math.floor(circle.size * zoom - 1)][(posx-startx) + (posy-starty) * (circle.size*2+1)]},pixelCol);
             pixels[index] = col.r * 255;
             pixels[index+1] = col.g * 255;
             pixels[index+2] = col.b * 255;
             pixels[index+3] = col.a * 255;
-
         }
     }
 }
@@ -58,9 +60,18 @@ function blendCols(a,b){
     return {r:r,g:g,b:blue,a:alpha};
 }
 
-function DrawCircles(circles,startTime){
+function DrawCircles(circles,pixels,startTime,zoom,mapWidth,mapHeight){
     while (circles.length > 0 && Date.now() - startTime < (1/60) * 1000){
-        AddCircle(circles[0]);
+        AddCircle(circles[0],pixels,zoom,mapWidth,mapHeight);
         circles.splice(0,1);
     }
+}
+
+function GenerateNewImage(circles,mapWidth,mapHeight,zoom,bstamps){
+    let pixels = new Uint8ClampedArray(mapWidth * mapHeight * 4 * zoom * zoom);
+    for (let i = 0; i < circles.length; i ++){
+        AddCircle(circles[i],pixels,zoom,mapWidth,mapHeight,bstamps);
+    }
+    postMessage({pixels:pixels},[pixels.buffer]);
+    close();
 }

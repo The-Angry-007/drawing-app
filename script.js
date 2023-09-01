@@ -15,7 +15,8 @@ let mapHeight = height;
 let brushSize = 3;
 let stepSize = brushSize / 3;
 let prevTime = 0;
-let workers = [];
+let worker;
+let workerIsWorking = false;
 let cursorPosx = 0;
 let cursorPosy = 0;
 let pixels = new Uint8ClampedArray(mapWidth * mapHeight * 4);
@@ -23,9 +24,19 @@ let circlesToBeDrawn = [];
 let mouseDown = false;
 let mousePosX = 0;
 let mousePosY = 0;
-
 let brushSizeStamps = [];
-for (let i = 1; i < 20; i ++){
+let zoom = 1;
+let drawnScale = 1;
+let desiredZoom = 1;
+let scroll = 0;
+
+addEventListener("wheel", (event) =>{
+    console.log("scrolling",event.deltaY);
+    drawnScale += (event.deltaY) / 1000;
+})
+
+
+for (let i = 1; i < 100; i ++){
     brushSizeStamps.push([]);
     let size = (i * 2)+1;
     //write circles to stamps
@@ -73,14 +84,14 @@ for (let i = 1; i < 20; i ++){
 
 document.addEventListener("mousedown", (event)=>{
     mouseDown = true;
-    mousePosX = event.clientX;
-    mousePosY = event.clientY;
+    mousePosX = event.clientX / drawnScale;
+    mousePosY = event.clientY / drawnScale;
     cursorPosx = mousePosX + stepSize;
     cursorPosy = mousePosY;
 })
 document.addEventListener("mousemove", (event) =>{
-    mousePosX = event.clientX;
-    mousePosY = event.clientY;
+    mousePosX = event.clientX / drawnScale;
+    mousePosY = event.clientY / drawnScale;
 })
 document.addEventListener("mouseup", () =>{
     mouseDown = false;
@@ -95,6 +106,7 @@ function animate(){
     }
     prevTime = time;
     fpsText.innerHTML = "fps: " + Math.floor(1/dt*1000);
+    let added = false;
     while (mouseDown && dist(mousePosX,mousePosY,cursorPosx,cursorPosy) >= stepSize){
         let size = dist(mousePosX,mousePosY,cursorPosx,cursorPosy); 
         cursorPosx -= (cursorPosx - mousePosX) / size * stepSize;
@@ -102,25 +114,32 @@ function animate(){
         let c = {x:cursorPosx,y:cursorPosy,size:brushSize}
         circles.push(c);
         circlesToBeDrawn.push(c);
+        added = true;
     }
-    DrawCircles(circlesToBeDrawn,time)
+    DrawCircles(circlesToBeDrawn,pixels,time,1,mapWidth,mapHeight)
     scaledCanvas.width = mapWidth;
     scaledCanvas.height = mapHeight;
-    scaledCtx.putImageData(new ImageData(pixels,mapWidth,mapHeight),0,0);
-    ctx.drawImage(scaledCanvas,0,0,width*2,height*2);    
+    scaledCtx.putImageData(new ImageData(pixels,mapWidth * zoom,mapHeight * zoom),0,0);
+    ctx.clearRect(0,0,width,height);
+    ctx.drawImage(scaledCanvas,0,0,Math.floor(width*drawnScale),Math.floor(height*drawnScale));
 
-    // if (moved){
-    //     if (worker != null){worker.terminate();}
-    //     worker = new Worker("canvasManager.js");
-    //     worker.postMessage({circles:circles,width:mapWidth,height:mapHeight});
-        
-    //     worker.addEventListener("message",(event)=>{
-    //         console.log("thread finished");
-    //         ctx.clearRect(0,0,width,height);
-    //         ctx.putImageData(event.data,0,0);
-    //         worker = null;
-    //     })
-    // }
+    //regenerate rasterization, if needed
+    if (drawnScale != desiredZoom){
+        if (workerIsWorking){
+            worker.terminate();
+        }
+        desiredZoom = drawnScale;
+        worker = new Worker("canvasManager.js");
+        worker.postMessage({circles:circles,zoom:desiredZoom,mapWidth:mapWidth,mapHeight:mapHeight,bstamps:brushSizeStamps});
+        worker.addEventListener("message", (e) =>{
+            console.log(e.data.pixels);
+            pixels = e.data.pixels;
+            zoom = desiredZoom;
+            drawnScale = 1;
+            workerIsWorking = false;
+        })
+    }
+
     requestAnimationFrame(animate);
 }
 animate();
